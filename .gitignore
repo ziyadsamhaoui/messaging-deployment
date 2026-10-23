@@ -1,0 +1,7 @@
+/docs/
+*.junie
+*.idea
+*.agents
+.env
+AGENTS.md
+docs/CONTAINERS.md
