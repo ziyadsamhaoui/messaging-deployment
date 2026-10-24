@@ -12,6 +12,20 @@ x-app: &app
   restart: unless-stopped
   networks: [badrlink-net]
 
+# Shared OpenTelemetry agent configuration. Only the service name differs per service,
+# so every JVM is launched identically and the observability decision lives in one place.
+x-observability: &observability
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_TRACES_EXPORTER: otlp
+  # Jaeger stores traces only. Without these two lines the agent would also push the
+  # JVM's own metrics and logs at a backend that does not accept them; metrics are
+  # scraped from /actuator/prometheus and logs are collected by Promtail instead.
+  OTEL_METRICS_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${DEPLOYMENT_ENVIRONMENT:-local}
+  MANAGEMENT_PORT: "9090"
+
 services:
 
   auth:
@@ -20,6 +34,8 @@ services:
     build:
       context: ./messaging-auth-service
     environment:
+      <<: *observability
+      OTEL_SERVICE_NAME: messaging-auth-service
       DB_HOST: postgres-auth
       DB_PORT: "5432"
       DB_NAME: auth_db
@@ -55,6 +71,8 @@ services:
       auth:
         condition: service_healthy
     environment:
+      <<: *observability
+      OTEL_SERVICE_NAME: messaging-user-service
       DB_HOST: postgres-user
       DB_PORT: "5432"
       DB_NAME: user_db
@@ -82,6 +100,8 @@ services:
       user:
         condition: service_healthy
     environment:
+      <<: *observability
+      OTEL_SERVICE_NAME: messaging-chat-service
       CHAT_SERVICE_PORT: "8083"
       MONGODB_URI: "mongodb://root:${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD to the value in messaging-infra/.env}@mongodb:27017/messaging_chat?authSource=admin&replicaSet=rs0"
       AUTH_JWK_SET_URI: http://auth:8081/oauth2/jwks
@@ -109,6 +129,8 @@ services:
       chat:
         condition: service_healthy
     environment:
+      <<: *observability
+      OTEL_SERVICE_NAME: messaging-realtime-gateway
       SERVER_PORT: "8084"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
@@ -142,6 +164,8 @@ services:
     build:
       context: ./messaging-notification-service
     environment:
+      <<: *observability
+      OTEL_SERVICE_NAME: messaging-notification-service
       NOTIFICATION_SERVICE_PORT: "8085"
       DB_HOST: postgres-notification
       DB_PORT: "5432"
@@ -170,6 +194,8 @@ services:
     build:
       context: ./messaging-attachment-service
     environment:
+      <<: *observability
+      OTEL_SERVICE_NAME: messaging-attachment-service
       ATTACHMENT_SERVICE_PORT: "8086"
       DB_HOST: postgres-attachment
       DB_PORT: "5432"
@@ -214,6 +240,8 @@ services:
     ports:
       - "8080:8080"
     environment:
+      <<: *observability
+      OTEL_SERVICE_NAME: messaging-api-gateway
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ""
