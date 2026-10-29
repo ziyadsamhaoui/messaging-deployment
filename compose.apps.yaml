@@ -1,9 +1,3 @@
-#   cd ../messaging-infra && docker compose up -d
-#   cd .. && docker compose -f compose.apps.yaml up -d --build
-#
-#   docker compose -f compose.apps.yaml ps            # health/status
-#   docker compose -f compose.apps.yaml logs -f auth   # one service
-#   docker compose -f compose.apps.yaml down           # keep infrastructure up
 
 
 name: badrlink-apps
@@ -12,15 +6,10 @@ x-app: &app
   restart: unless-stopped
   networks: [badrlink-net]
 
-# Shared OpenTelemetry agent configuration. Only the service name differs per service,
-# so every JVM is launched identically and the observability decision lives in one place.
 x-observability: &observability
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4317}
   OTEL_EXPORTER_OTLP_PROTOCOL: grpc
   OTEL_TRACES_EXPORTER: otlp
-  # Jaeger stores traces only. Without these two lines the agent would also push the
-  # JVM's own metrics and logs at a backend that does not accept them; metrics are
-  # scraped from /actuator/prometheus and logs are collected by Promtail instead.
   OTEL_METRICS_EXPORTER: none
   OTEL_LOGS_EXPORTER: none
   OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${DEPLOYMENT_ENVIRONMENT:-local}
@@ -43,7 +32,6 @@ services:
       DB_PASSWORD: ${POSTGRES_AUTH_PASSWORD}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      # Host tools use localhost:9092; containers must use the internal listener.
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_ENABLED: "true"
       JWT_ISSUER: http://auth:8081
@@ -134,7 +122,6 @@ services:
       SERVER_PORT: "8084"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      # must stay empty, shipped passwordless
       REDIS_PASSWORD: ""
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_ENABLED: "true"
@@ -175,8 +162,6 @@ services:
       JWT_JWK_SET_URI: http://auth:8081/oauth2/jwks
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_ENABLED: "true"
-      # needs the private/public key pairs, still successfully starts without them
-      # but will not send push notifications
       PUSH_ENABLED: ${PUSH_ENABLED:-true}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
